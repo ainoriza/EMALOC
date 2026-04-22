@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>TallerOS — Diagnóstico de conexión</title>
+<style>
+  body { font-family: monospace; background: #0d0d0f; color: #e8e8f0; padding: 30px; max-width: 800px; }
+  h1 { color: #e8ff47; margin-bottom: 6px; }
+  .sub { color: #555565; font-size: 12px; margin-bottom: 30px; }
+  label { display: block; font-size: 11px; color: #8888a0; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  input { width: 100%; background: #1c1c22; border: 1px solid #2a2a35; color: #e8e8f0; padding: 10px 12px; font-family: monospace; font-size: 13px; border-radius: 6px; outline: none; margin-bottom: 16px; box-sizing: border-box; }
+  input:focus { border-color: #e8ff47; }
+  button { background: #e8ff47; color: #0d0d0f; border: none; padding: 10px 20px; font-family: monospace; font-size: 13px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+  button.sec { background: #1c1c22; color: #e8e8f0; border: 1px solid #2a2a35; }
+  #log { background: #1c1c22; border: 1px solid #2a2a35; border-radius: 8px; padding: 16px; margin-top: 20px; min-height: 200px; font-size: 12px; line-height: 1.8; white-space: pre-wrap; word-break: break-all; }
+  .ok { color: #47ffb0; }
+  .err { color: #ff4760; }
+  .warn { color: #ffc547; }
+  .info { color: #47c8ff; }
+  .sep { color: #2a2a35; }
+</style>
+</head>
+<body>
+<h1>TallerOS — Diagnóstico</h1>
+<div class="sub">Usá esta página para encontrar exactamente qué está fallando en la conexión con Google Apps Script</div>
+
+<label>URL del Apps Script</label>
+<input type="text" id="url" placeholder="https://script.google.com/macros/s/.../exec" value="">
+
+<div>
+  <button onclick="test1()">1. Probar GET simple</button>
+  <button onclick="test2()">2. Probar POST text/plain</button>
+  <button onclick="test3()">3. Probar POST application/json</button>
+  <button onclick="test4()">4. Probar init (crear hojas)</button>
+  <button class="sec" onclick="clearLog()">Limpiar</button>
+</div>
+
+<div id="log">Resultados del diagnóstico aparecerán acá...\n</div>
+
+<script>
+const url = () => document.getElementById('url').value.trim();
+const log = document.getElementById('log');
+
+function addLog(msg, type = '') {
+  const span = document.createElement('span');
+  span.className = type;
+  span.textContent = msg + '\n';
+  log.appendChild(span);
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearLog() { log.innerHTML = ''; }
+
+function sep(title) {
+  addLog('─────────────────────────────────', 'sep');
+  addLog('▶ ' + title, 'info');
+}
+
+async function test1() {
+  sep('TEST 1: GET simple con ?action=getDashboard');
+  if (!url()) { addLog('⚠ Ingresá la URL primero', 'warn'); return; }
+  addLog('URL: ' + url() + '?action=getDashboard');
+  try {
+    addLog('Enviando fetch GET...');
+    const res = await fetch(url() + '?action=getDashboard', { method: 'GET' });
+    addLog('Status HTTP: ' + res.status + ' ' + res.statusText, res.ok ? 'ok' : 'err');
+    addLog('Headers response: ' + [...res.headers.entries()].map(([k,v])=>k+': '+v).join(' | '));
+    const text = await res.text();
+    addLog('Respuesta raw: ' + text.slice(0, 500));
+    try {
+      const json = JSON.parse(text);
+      addLog('JSON parseado OK: ok=' + json.ok, json.ok ? 'ok' : 'warn');
+      if (json.error) addLog('Error del servidor: ' + json.error, 'warn');
+    } catch(e) {
+      addLog('No es JSON válido: ' + e.message, 'err');
+    }
+  } catch(e) {
+    addLog('✕ FETCH FALLÓ: ' + e.name + ': ' + e.message, 'err');
+    addLog('Causa probable: CORS bloqueado o URL incorrecta', 'warn');
+    checkCors();
+  }
+}
+
+async function test2() {
+  sep('TEST 2: POST con Content-Type: text/plain');
+  if (!url()) { addLog('⚠ Ingresá la URL primero', 'warn'); return; }
+  const payload = JSON.stringify({ action: 'getDashboard' });
+  addLog('Payload: ' + payload);
+  try {
+    addLog('Enviando fetch POST text/plain...');
+    const res = await fetch(url(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: payload
+    });
+    addLog('Status HTTP: ' + res.status + ' ' + res.statusText, res.ok ? 'ok' : 'err');
+    const text = await res.text();
+    addLog('Respuesta raw: ' + text.slice(0, 500));
+    try {
+      const json = JSON.parse(text);
+      addLog('JSON parseado OK: ok=' + json.ok, json.ok ? 'ok' : 'warn');
+      if (json.error) addLog('Error del servidor: ' + json.error, 'warn');
+      if (json.ok) addLog('✓ CONEXIÓN EXITOSA CON text/plain', 'ok');
+    } catch(e) {
+      addLog('No es JSON válido: ' + e.message, 'err');
+    }
+  } catch(e) {
+    addLog('✕ FETCH FALLÓ: ' + e.name + ': ' + e.message, 'err');
+    checkCors();
+  }
+}
+
+async function test3() {
+  sep('TEST 3: POST con Content-Type: application/json');
+  if (!url()) { addLog('⚠ Ingresá la URL primero', 'warn'); return; }
+  const payload = JSON.stringify({ action: 'getDashboard' });
+  try {
+    addLog('Enviando fetch POST application/json...');
+    const res = await fetch(url(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+    addLog('Status HTTP: ' + res.status + ' ' + res.statusText, res.ok ? 'ok' : 'err');
+    const text = await res.text();
+    addLog('Respuesta raw: ' + text.slice(0, 500));
+    try {
+      const json = JSON.parse(text);
+      addLog('JSON parseado OK: ok=' + json.ok, json.ok ? 'ok' : 'warn');
+      if (json.ok) addLog('✓ CONEXIÓN EXITOSA CON application/json', 'ok');
+    } catch(e) {
+      addLog('No es JSON válido: ' + e.message, 'err');
+    }
+  } catch(e) {
+    addLog('✕ FETCH FALLÓ: ' + e.name + ': ' + e.message, 'err');
+    checkCors();
+  }
+}
+
+async function test4() {
+  sep('TEST 4: POST init (crear hojas en el Sheet)');
+  if (!url()) { addLog('⚠ Ingresá la URL primero', 'warn'); return; }
+  try {
+    const res = await fetch(url(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'init' })
+    });
+    const text = await res.text();
+    addLog('Respuesta: ' + text.slice(0, 500));
+    const json = JSON.parse(text);
+    if (json.ok) addLog('✓ Hojas inicializadas correctamente', 'ok');
+    else addLog('Error: ' + json.error, 'err');
+  } catch(e) {
+    addLog('✕ FETCH FALLÓ: ' + e.name + ': ' + e.message, 'err');
+  }
+}
+
+function checkCors() {
+  addLog('');
+  addLog('── Checklist CORS ──', 'info');
+  addLog('¿La URL termina en /exec? (no /dev)');
+  addLog('¿El deployment tiene "Who has access: Anyone"?');
+  addLog('¿Autorizaste los permisos de Google al deployar?');
+  addLog('¿Estás accediendo desde https:// (no file://)?');
+  addLog('');
+  addLog('Abrí DevTools → Network → buscá la request fallida');
+  addLog('y fijate si dice "CORS error" o "net::ERR_FAILED"');
+}
+
+// Pre-cargar URL guardada
+window.onload = () => {
+  const saved = localStorage.getItem('taller_api_url');
+  if (saved) {
+    document.getElementById('url').value = saved;
+    addLog('URL cargada desde localStorage: ' + saved, 'info');
+  }
+};
+</script>
+</body>
+</html>
