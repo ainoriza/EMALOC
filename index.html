@@ -1313,19 +1313,14 @@ function goto(sec) {
 async function api(action, body = {}) {
   if (!API_URL) { toast('Configurá la URL del API primero', 'warning'); return null; }
   try {
-    let url, opts;
-    if (Object.keys(body).length === 0) {
-      url = `${API_URL}?action=${action}`;
-      opts = { method: 'GET' };
-    } else {
-      url = API_URL;
-      opts = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...body })
-      };
-    }
-    const res = await fetch(url, opts);
+    // Google Apps Script requiere que todo vaya como POST con Content-Type text/plain
+    // para evitar el preflight CORS que bloquea application/json
+    const payload = JSON.stringify({ action, ...body });
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: payload
+    });
     const data = await res.json();
     if (!data.ok) { toast(data.error || 'Error en API', 'error'); return null; }
     return data;
