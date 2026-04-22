@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> EMA Local — Sistema de Gestión</title>
+<title>TallerOS — Sistema de Gestión</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -499,6 +499,41 @@ select option { background: var(--bg3); }
   align-items: center;
   gap: 12px;
 }
+
+/* ── LIGHT THEME ───────────────────────────────────────────── */
+body.light {
+  --bg: #f4f4f6;
+  --bg2: #ffffff;
+  --bg3: #eaeaef;
+  --border: #d4d4e0;
+  --text: #1a1a2e;
+  --text2: #555570;
+  --text3: #9999b0;
+  --shadow: 0 4px 24px rgba(0,0,0,0.1);
+}
+body.light #sidebar { background: var(--bg2); }
+body.light .kpi-card { background: var(--bg2); }
+body.light table thead tr { background: var(--bg3); }
+body.light input, body.light select, body.light textarea {
+  background: var(--bg3);
+  color: var(--text);
+}
+body.light .modal { background: var(--bg2); }
+body.light .toast { background: var(--bg2); }
+
+#theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 14px;
+  margin-top: 8px;
+  width: 100%;
+  transition: all .15s;
+}
+#theme-toggle:hover { background: var(--bg3); color: var(--text); }
 </style>
 </head>
 <body>
@@ -506,7 +541,7 @@ select option { background: var(--bg3); }
 <!-- ── SIDEBAR ──────────────────────────────────────────────── -->
 <div id="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-mark">EMA Local OS</div>
+    <div class="logo-mark">TallerOS</div>
     <div class="logo-sub">Gestión · Electrónica</div>
   </div>
   <nav>
@@ -549,6 +584,7 @@ select option { background: var(--bg3); }
       <div class="dot"></div>
       <span id="api-status-text">sin conectar</span>
     </div>
+    <button id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">&#9728;</button>
   </div>
 </div>
 
@@ -1257,7 +1293,7 @@ select option { background: var(--bg3); }
 <!-- ════ JAVASCRIPT ══════════════════════════════════════════ -->
 <script>
 // ── CONFIG ─────────────────────────────────────────────────
-let API_URL = localStorage.getItem('taller_api_url') || '';
+let API_URL = 'https://script.google.com/macros/s/AKfycbx9hE0Iyx6xaDQZzCp67mLUzPqfzmKitaDByxIO06f-ailiTark8HjKKW3T470p7bR22A/exec';
 let tiposArticulo = [];
 let subtiposArticulo = {};
 let stockData = [];
@@ -1272,6 +1308,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('dash-fecha').textContent =
     d.toLocaleDateString('es-AR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
+  initTheme();
+
   // Defaults de fechas
   const hoy = new Date().toISOString().split('T')[0];
   ['v-fecha','m-fecha','r-fecha-ingreso'].forEach(id => {
@@ -1279,13 +1317,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.value = hoy;
   });
 
-  if (!API_URL) {
-    document.getElementById('config-banner').style.display = 'flex';
-  } else {
-    document.getElementById('cfg-api-url').value = API_URL;
-    setApiStatus('ok', 'conectado');
-    loadAll();
-  }
+  document.getElementById('cfg-api-url').value = API_URL;
+  setApiStatus('ok', 'conectado');
+  loadAll();
 });
 
 // ── NAVEGACIÓN ──────────────────────────────────────────────
@@ -1992,8 +2026,9 @@ async function eliminarGasto(id) {
 }
 
 // ── CONFIGURACIÓN ────────────────────────────────────────────
-function loadConfigUI() {
+async function loadConfigUI() {
   document.getElementById('cfg-api-url').value = API_URL || '';
+  if (API_URL) await loadConfigData();
   renderTiposUI();
   renderSubtiposUI();
 }
@@ -2123,6 +2158,22 @@ function toast(msg, type = 'success') {
   el.innerHTML = `<span style="font-size:14px">${icons[type]||'·'}</span><span>${msg}</span>`;
   document.getElementById('toast-container').appendChild(el);
   setTimeout(() => el.remove(), 3500);
+}
+
+
+// ── TEMA ─────────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('taller_theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-toggle').textContent = isLight ? '☽' : '☀';
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('taller_theme');
+  if (saved === 'light') {
+    document.body.classList.add('light');
+    document.getElementById('theme-toggle').textContent = '☽';
+  }
 }
 
 // Cerrar modal al click afuera
